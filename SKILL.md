@@ -5,8 +5,8 @@ compatibility: Requires Python 3.10+ with PyMuPDF and Pillow.
 license: MIT
 metadata:
   version: "0.1.0"
-  author: "hongpan-uva"
-  repository: "https://github.com/hongpan-uva/paper-to-method-handbook.git"
+  author: "Hongpan Zhang"
+  repository: "https://github.com/hongpan-z/paper-to-method-handbook.git"
 ---
 
 # Paper to Method Handbook

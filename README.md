@@ -6,11 +6,9 @@ Turn a published paper PDF into a source-grounded, method-centered Markdown hand
 
 - Reconstructs a paper's methods as reproducible analytical units ordered by data dependency, not paper chronology.
 - Records tool names, versions, flags, filters, sample sizes and statistical tests.
-- Marks missing settings as "Not specified" instead of inventing defaults.
-- Crops and embeds the figure panels cited in each Results section. Consecutive cited panels become one union rectangle; citation gaps split into separate crops.
+- Crops and embeds the figure panels cited in each Results section.
 - Produces a single Markdown handbook, figure assets, source inventory, working units and a QA report.
-- Supports complete experimental plus computational methods, or a scoped computational/data-analysis workflow.
-- Produces one handbook per invocation; run it twice if you need both scopes.
+- Supports complete-methods-based reconstruction, or a scoped workflow.
 
 It is not a paper summary, a peer-review tool, or a results-only digest.
 
@@ -19,13 +17,13 @@ It is not a paper summary, a peer-review tool, or a results-only digest.
 Requires Node.js 22.20+ for the skills CLI.
 
 ```bash
-npx skills add hongpan-uva/paper-to-method-handbook --skill paper-to-method-handbook -a opencode --copy
+npx skills add hongpan-z/paper-to-method-handbook --skill paper-to-method-handbook -a opencode --copy
 ```
 
 Global install:
 
 ```bash
-npx skills add hongpan-uva/paper-to-method-handbook --skill paper-to-method-handbook -a opencode -g --copy -y
+npx skills add hongpan-z/paper-to-method-handbook --skill paper-to-method-handbook -a opencode -g --copy -y
 ```
 
 ### Manual install
@@ -35,7 +33,7 @@ Clone the repository and copy the skill into your OpenCode skills directory.
 macOS / Linux:
 
 ```bash
-git clone https://github.com/hongpan-uva/paper-to-method-handbook.git
+git clone https://github.com/hongpan-z/paper-to-method-handbook.git
 mkdir -p .opencode/skills
 cp -R paper-to-method-handbook .opencode/skills/
 ```
@@ -43,7 +41,7 @@ cp -R paper-to-method-handbook .opencode/skills/
 Windows PowerShell:
 
 ```powershell
-git clone https://github.com/hongpan-uva/paper-to-method-handbook.git
+git clone https://github.com/hongpan-z/paper-to-method-handbook.git
 New-Item -ItemType Directory -Force -Path ".opencode\skills" | Out-Null
 Copy-Item -Recurse ".\paper-to-method-handbook" ".opencode\skills\paper-to-method-handbook"
 ```
