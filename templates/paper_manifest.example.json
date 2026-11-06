@@ -1,0 +1,54 @@
+{
+  "slug": "example-2026",
+  "paper": {
+    "title": "Example paper",
+    "doi": "10.0000/example",
+    "pdf": "../papers/example.pdf",
+    "page_count": 20
+  },
+  "handbook": "example-2026.md",
+  "assets_dir": "example-2026.assets",
+  "figure_rights": "user-confirmed",
+  "default_dpi": 300,
+  "padding_pt": 6,
+  "padding_px": 15,
+  "figures": [
+    {
+      "id": "Figure 1",
+      "page": 4,
+      "mode": "page-crop",
+      "units": "pt",
+      "panels": {
+        "A": [85, 95, 320, 230],
+        "B": [324, 95, 562, 230],
+        "C": [85, 270, 160, 455]
+      }
+    },
+    {
+      "id": "ED Fig. 2",
+      "page": 22,
+      "mode": "embedded-panel",
+      "units": "px",
+      "image_index": 0,
+      "panels": {
+        "A": [100, 80, 1600, 2550],
+        "B": [1550, 80, 3952, 2550]
+      }
+    }
+  ],
+  "panel_sets": [
+    {
+      "id": "Figure 1A-B",
+      "figure": "Figure 1",
+      "panels": ["A", "B"],
+      "filename": "figure01a-b.png"
+    },
+    {
+      "id": "Figure 1B-C",
+      "figure": "Figure 1",
+      "panels": ["B", "C"],
+      "filename": "figure01b-c.png"
+    }
+  ],
+  "groups": []
+}

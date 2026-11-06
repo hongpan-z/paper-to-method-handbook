@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Generated run artifacts
+_qa/
+_backup/
+*.log
+
+# Development-only fixtures, not part of the public skill package
+examples/
+evals/

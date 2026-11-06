@@ -1,0 +1,56 @@
+{
+  "title": "Paper methods handbook",
+  "doi": "10.0000/example",
+  "organizing_principle": "data layer or analytical workflow",
+  "scope": "Complete methods reconstruction. 'Not specified' means the paper does not state a setting.",
+  "chapters": [
+    {
+      "id": "1",
+      "title": "Study design and data inventory",
+      "goal": "Establish the samples, models and data types that supply downstream analyses.",
+      "units": [
+        {
+          "id": "1.1",
+          "title": "Cohort and tissue selection",
+          "goal_principle": "Define the cohort and select samples that meet the assay's quality thresholds.",
+          "inputs": ["FFPE blocks", "clinical annotation", "RNA quality measurements"],
+          "tools": [
+            {
+              "name": "RNeasy FFPE",
+              "version": "not specified",
+              "parameters": ["manufacturer protocol"]
+            }
+          ],
+          "methods": [
+            "Describe sample selection and inclusion criteria.",
+            "Describe RNA quality assessment and the DV200 threshold.",
+            "Record missing settings as 'Not specified'."
+          ],
+          "outputs": ["selected blocks", "sample-to-assay map"],
+          "evidence": ["Figure 1A", "Figure 1B", "Table S1"],
+          "result_blocks": [
+            {
+              "evidence": ["Figure 1A", "Figure 1B"]
+            }
+          ],
+          "depends_on": [],
+          "source_refs": [
+            {
+              "page": 24,
+              "section": "Human spleen samples",
+              "figure_legend": "Figure 1A"
+            }
+          ],
+          "unspecified": ["exact spleen region", "number of sections per assay"],
+          "cautions": ["Small cohort; no sex-stratified analysis."]
+        }
+      ]
+    }
+  ],
+  "excluded": [
+    {
+      "item": "Supplementary Figures",
+      "reason": "Not included in the main PDF; cited by label."
+    }
+  ]
+}
