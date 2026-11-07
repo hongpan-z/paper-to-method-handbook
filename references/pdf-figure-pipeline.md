@@ -124,7 +124,7 @@ Custom concatenation or cross-panel layouts are an explicit fallback, not the de
 }
 ```
 
-Kinds are `panel`, `panel-set`, `full` and `group`. The verifier uses the index to check that a caption label matches the embedded set and that a full figure is not used for a panel claim.
+Kinds are `panel`, `panel-set`, `full` and `group`. The verifier uses the index to check that a caption label matches the embedded set and that a full figure is not used for a panel claim. The index is temporary; `finalize_output.py` removes it from the delivered assets directory unless `--keep-work` is used.
 
 ## Calibration workflow
 
@@ -137,6 +137,8 @@ Kinds are `panel`, `panel-set`, `full` and `group`. The verifier uses the index 
 7. Run `build_panel_sets.py --write --backup`.
 8. Run `extract_figures.py --previews`.
 9. Inspect `_qa/previews/`. Re-crop if a header, caption or panel is cut off.
+
+The manifest, `_calibration/`, `_qa/` previews and backups are temporary. `finalize_output.py` removes them at delivery unless `--keep-work` is used.
 
 The calibration script never guesses boxes. If a figure has no embedded image and is vector-rendered, use `page-crop`.
 
@@ -166,7 +168,8 @@ The PDF may have accents or spaces in its filename. Keep the manifest path as UT
 
 - No embedded image: use `page-crop`.
 - Caption/header inside the crop: reduce the box using the caption bounding box from `captions.json`.
-- Panel boundaries unclear: crop the whole figure and state that panel-level extraction was not possible; record the reason in the QA report.
+- Panel boundaries unclear: crop the whole figure and state that panel-level extraction was not possible; record the reason in the final response.
 - A supplementary figure is not in the PDF: cite it by label and state that it was not reproduced.
-- Figure extraction fails: keep a textual Results reference and record the failure in the QA report; do not block the handbook.
+- Figure extraction fails: keep a textual Results reference and record the failure in the final response; do not block the handbook.
+- Deliberate no-figure handbook: skip the manifest and figure pipeline, leave unit `evidence` empty, verify with `verify_handbook.py --text-only`, and record how the source text was obtained and what figure evidence is missing.
 - A scoped handbook shares assets with a full handbook: verify with `--reference-handbook full-handbook.md` so the unreferenced-asset check uses the union.

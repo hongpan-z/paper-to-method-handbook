@@ -51,7 +51,7 @@ Scope: {{SCOPE_PARAGRAPH}} The handbook is source-grounded: "Not specified" mean
 
 ---
 
-# Reproducibility and implementation notes
+# Reproducibility notes
 
 ## A. Minimal executable analysis order
 
@@ -60,9 +60,9 @@ The following is an implementation synthesis of the dependencies documented abov
 1. {{STEP_1}}
 2. {{STEP_2}}
 
-## B. Resolution and key-threshold quick reference
+## B. Key parameters and thresholds
 
-| Analysis | Resolution or principal settings | Notes |
+| Analysis | Key parameters or settings | Notes |
 |---|---|---|
 | {{ANALYSIS}} | {{SETTINGS}} | {{NOTES}} |
 

@@ -63,7 +63,7 @@ The catalogue anchors must resolve to the chapter headings. Use lowercase, hyphe
 - Heading level 2, numbered `N.M`.
 - **Goal and principle.** present.
 - **Methods** present; at least one bullet or paragraph.
-- **Results** present; may be text-only if no panel is available, but explain why.
+- **Results** present; may be text-only if no panel is available, but explain why. A deliberately no-figure handbook is verified with `verify_handbook.py --text-only`.
 - If a figure is embedded, the caption label must be bold and followed by a colon.
 - The caption label must match the embedded asset's panel set. A full figure is allowed only for a whole-figure citation or a figure with no panel structure.
 
@@ -111,15 +111,15 @@ The caption label must list the cited panels embedded in the asset, for example 
 ## End matter
 
 ```
-# Reproducibility and implementation notes
+# Reproducibility notes
 
 ## A. Minimal executable analysis order
 
 <Numbered synthesis of dependencies. Label it as a synthesis, not an authors' script.>
 
-## B. Resolution and key-threshold quick reference
+## B. Key parameters and thresholds
 
-| Analysis | Resolution or principal settings | Notes |
+| Analysis | Key parameters or settings | Notes |
 |---|---|---|
 | ... | ... | ... |
 

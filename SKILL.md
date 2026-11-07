@@ -61,11 +61,35 @@ The LLM owns everything that requires reading the paper or judging meaning:
 
 **Rule of thumb:** if a transformation can be expressed as a parser or regex over structured artifacts, put it in a script; if it requires understanding the paper, leave it to the LLM. Formatting is split: the LLM writes content and semantic emphasis; scripts enforce canonical syntax and lint deviations.
 
+## Dependency handling
+
+Before running any PDF script:
+
+1. **Check environment.** Run `python scripts/check_environment.py`. It verifies Python 3.10+ and imports PyMuPDF and Pillow. If it exits nonzero, do not run the PDF scripts.
+2. **Ask permission to install.** Do not install packages, create a virtual environment, or run a command that downloads dependencies without explicit user approval.
+3. **Prefer an ephemeral `uv` environment or a venv.** With `uv`:
+
+   ```bash
+   uv run --with pymupdf --with pillow python scripts/pdf_inventory.py ...
+   ```
+
+   Otherwise use a virtual environment:
+
+   ```bash
+   python -m venv .venv
+   # Windows
+   .venv\Scripts\python -m pip install -r scripts/requirements.txt
+   # macOS/Linux
+   .venv/bin/python -m pip install -r scripts/requirements.txt
+   ```
+
+4. **Fall back to text-only if installation is unavailable.** Obtain the paper text from the user, an existing `source/source_text.md`, or `pdftotext`; skip `pdf_inventory.py`, the figure manifest and figure extraction; leave each unit's `evidence` empty; format the handbook and verify with `verify_handbook.py --text-only`. Record in `working/scope.md` and summarize in the final response that figure extraction was skipped, how the text was obtained and what page anchors or caption evidence are missing. The fallback cannot read a PDF without PyMuPDF, so a text source must be supplied.
+
 ## Workflow
 
 ### Phase 1 — Scope and source inventory
 
-Run `scripts/pdf_inventory.py` to create page-anchored evidence:
+Run `python scripts/check_environment.py` first (see Dependency handling). Then run `scripts/pdf_inventory.py` to create page-anchored evidence:
 
 ```bash
 python scripts/pdf_inventory.py \
@@ -102,6 +126,8 @@ Writing rules:
 - Put synthesis and caveats in the end matter, not silently in Methods.
 
 ### Phase 4 — Extract and embed cited panels
+
+If the handbook is intentionally text-only, skip this phase and record the limitation (see Dependency handling).
 
 Create a per-paper manifest with `scripts/paper_manifest.py init`, then calibrate panel boxes:
 
@@ -153,24 +179,45 @@ python scripts/verify_handbook.py \
 
 The verifier also checks that every caption matches its asset's panel set, that panel-specific claims do not use a full figure, and that every cited consecutive run has a matching image. If a scoped handbook shares an assets directory with a full handbook, pass `--reference-handbook full-handbook.md` so the unreferenced-asset check uses the union of both handbooks.
 
+For a deliberate no-figure handbook, add `--text-only` and do not pass a manifest or assets directory:
+
+```bash
+python scripts/verify_handbook.py \
+  --handbook "output/handbook.md" \
+  --units "output/working/units.json" \
+  --text-only \
+  --strict
+```
+
+`--text-only` skips manifest, asset, image, caption and figure-coverage checks. Structure, anchors, unit schema, formatting and fidelity checks still run.
+
 ### Phase 6 — Delivery
 
-Use this layout:
+The delivered output contains only the handbook and its assets:
 
 ```
 <output>/
 ├── <slug>.md
-├── <slug>.assets/
-├── source/                 # page text, captions, inventory, thumbnails
-├── working/
-│   ├── scope.md
-│   ├── units.json
-│   └── paper_manifest.json
-├── qa_report.md
-└── qa_report.json
+└── <slug>.assets/
 ```
 
-Deliver the single Markdown handbook plus assets. Keep `source/` and `working/` as provenance. Do not put generated handbooks inside the skill directory.
+A text-only handbook contains only `<slug>.md`.
+
+During the workflow, `source/`, `working/`, `_calibration/`, `_qa/`, `_backup/`, `paper_manifest.json` and QA report files are temporary. After verification, remove them by default:
+
+```bash
+python scripts/finalize_output.py --output "output" --apply
+```
+
+The script keeps top-level handbook Markdown files and `*.assets/` directories, removes known temporary artifacts, and never deletes handbooks, assets, source PDFs or paths outside the output directory. Run it without `--apply` to preview the removals.
+
+If the user asks to retain provenance or debugging artifacts, use `--keep-work`:
+
+```bash
+python scripts/finalize_output.py --output "output" --keep-work
+```
+
+Summarize verification results and known limitations in the final response. Write `qa_report.md` and `qa_report.json` only when the user wants the work files retained. Do not put generated handbooks inside the skill directory.
 
 ## Output contract
 
@@ -183,8 +230,8 @@ Every handbook contains:
 5. `## Chapter catalogue` with resolvable anchors.
 6. H1 chapters, each with a chapter-level **Goal and principle.**
 7. H2 units (`N.M Title`), each with **Goal and principle.**, **Methods**, **Results**.
-8. `# Reproducibility and implementation notes` with `## A.` minimal analysis order, `## B.` resolution/threshold quick reference, `## C.` methodological cautions, `## D.` source-specific resources.
-9. Bold figure-caption labels whose panel set matches the embedded asset; panel crops for specific citations and union rectangles for consecutive runs.
+8. `# Reproducibility notes` with `## A.` minimal analysis order, `## B.` key parameters and thresholds, `## C.` methodological cautions, `## D.` source-specific resources.
+9. Bold figure-caption labels whose panel set matches the embedded asset; panel crops for specific citations and union rectangles for consecutive runs. A text-only handbook may omit figures but must state why.
 
 ## Formatting contract
 
@@ -203,6 +250,7 @@ Full rules are in `references/formatting.md`. Summary:
 
 | Script | Purpose | Deterministic? |
 |---|---|---|
+| `check_environment.py` | Verify Python 3.10+ and PyMuPDF/Pillow; print install and fallback guidance | Yes; no PDF access |
 | `pdf_inventory.py` | Page text, candidate headings/captions, image rectangles, thumbnails | Yes; raw facts and candidates only |
 | `paper_manifest.py` | Initialize and validate a per-paper figure manifest | Yes; no page/panel guessing |
 | `calibrate_figure_boxes.py` | Render grids and detected image rectangles for manual coordinate entry | Yes; rendering only |
@@ -210,6 +258,7 @@ Full rules are in `references/formatting.md`. Summary:
 | `extract_figures.py` | Crop panels and union-rectangle panel sets; write `asset_index.json` and previews | Yes |
 | `format_handbook.py` | Normalize safe Markdown formatting and bold Results captions | Yes; skips ambiguous cases |
 | `verify_handbook.py` | Structure, anchors, assets, caption/panel matching, coverage, optional fidelity flags | Yes; hard errors vs. warnings |
+| `finalize_output.py` | Remove temporary workflow files; keep only handbooks and assets | Yes; dry-run by default |
 | `prune_unreferenced_assets.py` | Report or move assets unreferenced by one or more handbooks; never deletes | Yes |
 | `common.py` | Shared deterministic helpers | Yes |
 
@@ -233,7 +282,7 @@ Before considering the handbook complete:
 2. **Data validity:** every image resolves and opens; no missing or unreferenced assets; anchors resolve; no placeholders.
 3. **Structural completeness:** every chapter has a goal; every unit has Goal/principle, Methods and Results; end matter A–D exists.
 4. **Panel/citation consistency:** each caption label matches the asset's panel set; every cited consecutive run has one matching image; full figures are not used for panel claims; citation gaps are not bridged.
-5. **Coverage:** every main figure is represented in the manifest and either appears in a unit or is explicitly excluded; every Methods heading is mapped to a unit or exclusion.
+5. **Coverage:** every main figure is represented in the manifest and either appears in a unit or is explicitly excluded; every Methods heading is mapped to a unit or exclusion. For a text-only handbook, record that figure coverage was intentionally skipped and limit the coverage statement to the supplied text.
 6. **Fidelity:** spot-check tool versions, parameters and numbers against the source; audit every "Not specified".
 7. **Scientific plausibility:** check causal language, denominators, recurrence definitions and platform mixing.
 
@@ -249,7 +298,8 @@ Before considering the handbook complete:
 
 ## Environment and safety
 
-- Python 3.10+ with PyMuPDF and Pillow; no network access is required for the core workflow.
+- Run `scripts/check_environment.py` first. Requires Python 3.10+ with PyMuPDF and Pillow; prefer `uv run --with pymupdf --with pillow ...` or a venv. If dependencies cannot be installed, use the text-only fallback and record the limitation.
+- No network access is required for the core workflow after dependencies are installed.
 - Process PDFs locally; do not upload papers or unpublished data to external services.
 - Figure extraction is allowed by the skill, but the user is responsible for figure reuse rights. Record `figure_rights: user-confirmed` in the manifest.
 - Destructive operations are opt-in: `extract_figures.py --force` overwrites, `prune_unreferenced_assets.py --apply` moves files to a backup, and `format_handbook.py --backup` preserves the prior version.

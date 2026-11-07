@@ -64,7 +64,7 @@ Two case studies are available in the mother project:
 - Use unit IDs and `§N.M` cross-references.
 - Put tool names in bold and literal parameters in backticks.
 - Use one Results block per unit and a bold caption label.
-- Keep the end matter: implementation order, threshold table, cautions, resources.
+- Keep the Reproducibility notes: implementation order, key parameters and thresholds, cautions, resources.
 
 ## Patterns to avoid
 

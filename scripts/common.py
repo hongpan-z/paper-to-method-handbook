@@ -6,10 +6,11 @@ import json
 import re
 import unicodedata
 from pathlib import Path
-from typing import Any, Iterable
+from typing import TYPE_CHECKING, Any, Iterable
 
-import pymupdf
-from PIL import Image
+if TYPE_CHECKING:
+    import pymupdf
+    from PIL import Image
 
 FIGURE_LABEL_RE = re.compile(
     r"^\s*(?P<prefix>Extended\s+Data\s+Fig\.?|ED\s+Fig\.?|Supplementary\s+Fig\.?|Suppl\.?\s+Fig\.?|Fig\.?|Figure)\s*"
@@ -262,6 +263,8 @@ def split_consecutive_runs(panels: Iterable[str]) -> list[list[str]]:
 
 
 def pixmap_to_image(pix: pymupdf.Pixmap) -> Image.Image:
+    from PIL import Image
+
     mode = "RGBA" if pix.alpha else "RGB"
     image = Image.frombytes(mode, (pix.width, pix.height), pix.samples)
     return image.convert("RGB")
@@ -332,6 +335,8 @@ def extract_numbers(text: str) -> list[str]:
 
 
 def image_size(path: Path) -> tuple[int, int]:
+    from PIL import Image
+
     with Image.open(path) as image:
         return image.size
 

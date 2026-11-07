@@ -3,6 +3,8 @@
 Hard checks fail the run. Heuristic fidelity and coverage checks emit warnings
 for the LLM to audit; they do not establish scientific validity. Panel-specific
 claims must use panel crops or consecutive-run panel sets, not full figures.
+--text-only skips all figure, manifest and asset checks for a deliberate
+no-figure handbook; text, structure and fidelity checks still run.
 """
 
 from __future__ import annotations
@@ -13,8 +15,6 @@ import re
 import sys
 from pathlib import Path
 from urllib.parse import unquote
-
-from PIL import Image
 
 from common import (
     anchor_slug,
@@ -110,6 +110,12 @@ def verify_images(
 ) -> tuple[int, set[Path]]:
     referenced: set[Path] = set()
     image_count = 0
+    try:
+        from PIL import Image
+    except ImportError as exc:
+        if any(IMAGE_RE.search(line) for line in lines):
+            add_issue(errors, f"Pillow is required to verify images: {exc}")
+        return image_count, referenced
     for line_number, line in enumerate(lines, 1):
         for raw in IMAGE_RE.findall(line):
             image_count += 1
@@ -488,6 +494,11 @@ def main() -> int:
     parser.add_argument("--source", type=Path, help="pdf_inventory.py output directory")
     parser.add_argument("--assets-dir", type=Path)
     parser.add_argument("--strict", action="store_true")
+    parser.add_argument(
+        "--text-only",
+        action="store_true",
+        help="skip manifest, asset, image, caption and figure-coverage checks for a no-figure handbook",
+    )
     parser.add_argument("--fidelity", action="store_true")
     parser.add_argument("--min-image-px", type=int, default=100)
     parser.add_argument("--asset-index", type=Path)
@@ -503,7 +514,18 @@ def main() -> int:
     lines = text.splitlines()
     errors: list[dict] = []
     warnings: list[dict] = []
-    stats: dict[str, int] = {}
+    stats: dict[str, object] = {}
+    text_only = args.text_only
+    stats["text_only"] = text_only
+    if text_only:
+        for option, value in (
+            ("--manifest", args.manifest),
+            ("--assets-dir", args.assets_dir),
+            ("--asset-index", args.asset_index),
+            ("--reference-handbook", args.reference_handbook),
+        ):
+            if value:
+                print(f"NOTE: --text-only ignores {option}")
 
     if not lines:
         add_issue(errors, "handbook is empty")
@@ -566,116 +588,125 @@ def main() -> int:
                 add_issue(errors, f"unit {unit['text']} missing {label}", unit["line"])
 
     end_matter = next(
-        (section for section in sections if section["level"] == 1 and "reproducibility and implementation notes" in section["text"].lower()),
+        (section for section in sections if section["level"] == 1 and "reproducibility notes" in section["text"].lower()),
         None,
     )
     if end_matter is None:
-        add_issue(errors, "missing '# Reproducibility and implementation notes' section")
+        add_issue(errors, "missing '# Reproducibility notes' section")
     else:
         end_body = "\n".join(lines[end_matter["line"] - 1 : end_matter["end"]])
         for letter in "ABCD":
             if not re.search(rf"(?im)^##\s+{letter}\.", end_body):
                 add_issue(errors, f"end matter missing subsection {letter}.")
 
-    assets_dir = args.assets_dir.resolve() if args.assets_dir else None
+    assets_dir = None
     manifest = None
-    if args.manifest:
-        manifest_path = args.manifest.resolve()
-        if not manifest_path.exists():
-            add_issue(errors, f"manifest not found: {manifest_path}")
-        else:
-            try:
-                manifest = read_json(manifest_path)
-                paths = manifest_paths(manifest_path, manifest)
-                assets_dir = assets_dir or paths["assets"]
-            except Exception as exc:
-                add_issue(errors, f"manifest invalid: {exc}")
-
     asset_index: dict[str, dict] = {}
-    if args.asset_index and args.asset_index.exists():
-        try:
-            asset_index = read_json(args.asset_index)
-        except Exception as exc:
-            add_issue(warnings, f"cannot read asset index: {exc}")
-    elif assets_dir and (assets_dir / "asset_index.json").exists():
-        try:
-            asset_index = read_json(assets_dir / "asset_index.json")
-        except Exception as exc:
-            add_issue(warnings, f"cannot read asset_index.json: {exc}")
-    elif manifest is not None:
-        asset_index = manifest_asset_index(manifest)
+    referenced: set[Path] = set()
+    image_count = 0
+    manifest_figures: list[dict] = []
+    if text_only:
+        stats["images"] = 0
+        stats["images_ignored"] = sum(len(IMAGE_RE.findall(line)) for line in lines)
+        stats["figure_checks"] = "skipped"
+    else:
+        assets_dir = args.assets_dir.resolve() if args.assets_dir else None
+        if args.manifest:
+            manifest_path = args.manifest.resolve()
+            if not manifest_path.exists():
+                add_issue(errors, f"manifest not found: {manifest_path}")
+            else:
+                try:
+                    manifest = read_json(manifest_path)
+                    paths = manifest_paths(manifest_path, manifest)
+                    assets_dir = assets_dir or paths["assets"]
+                except Exception as exc:
+                    add_issue(errors, f"manifest invalid: {exc}")
 
-    image_count, referenced = verify_images(
-        lines, handbook_path, assets_dir, args.min_image_px, errors, warnings
-    )
-    stats["images"] = image_count
-    if args.reference_handbook:
-        for reference_path in args.reference_handbook:
-            reference = reference_path.resolve()
-            if not reference.exists():
-                add_issue(warnings, f"reference handbook not found: {reference}")
+        if args.asset_index and args.asset_index.exists():
+            try:
+                asset_index = read_json(args.asset_index)
+            except Exception as exc:
+                add_issue(warnings, f"cannot read asset index: {exc}")
+        elif assets_dir and (assets_dir / "asset_index.json").exists():
+            try:
+                asset_index = read_json(assets_dir / "asset_index.json")
+            except Exception as exc:
+                add_issue(warnings, f"cannot read asset_index.json: {exc}")
+        elif manifest is not None:
+            asset_index = manifest_asset_index(manifest)
+
+        image_count, referenced = verify_images(
+            lines, handbook_path, assets_dir, args.min_image_px, errors, warnings
+        )
+        stats["images"] = image_count
+        if args.reference_handbook:
+            for reference_path in args.reference_handbook:
+                reference = reference_path.resolve()
+                if not reference.exists():
+                    add_issue(warnings, f"reference handbook not found: {reference}")
+                    continue
+                referenced |= collect_referenced_paths(reference)
+
+        manifest_figures = list((manifest or {}).get("figures", []))
+        for line_number, line in enumerate(lines, 1):
+            match = IMAGE_RE.search(line)
+            if not match:
                 continue
-            referenced |= collect_referenced_paths(reference)
-
-    manifest_figures = list((manifest or {}).get("figures", []))
-    for line_number, line in enumerate(lines, 1):
-        match = IMAGE_RE.search(line)
-        if not match:
-            continue
-        asset = Path(link_target(match.group(1))).name
-        info = caption_block_info(lines, line_number)
-        if info is None:
-            add_issue(errors, "image has no bold caption label", line_number)
-            continue
-        if info.get("prefix") is None:
-            add_issue(warnings, f"caption labels span multiple figures: {info['label']}", line_number)
-            continue
-        entry = asset_index.get(asset)
-        if entry is None:
-            add_issue(warnings, f"asset is not in the asset index: {asset}", line_number)
-            continue
-        figure_id = manifest_figure_id(info, manifest_figures)
-        if figure_id is None:
-            add_issue(warnings, f"caption figure not found in manifest: {info['label']}", line_number)
-            continue
-        panels = panel_tuple(info["panels"])
-        entry_panels = panel_tuple(entry.get("panels", []))
-        kind = entry.get("kind")
-        if panels:
-            if kind == "full":
-                add_issue(errors, f"full-figure asset used for panel caption: {info['label']}", line_number)
-            elif kind in {"panel", "panel-set", "group"}:
-                if entry.get("figure") != figure_id:
-                    add_issue(errors, f"asset figure {entry.get('figure')} does not match caption {info['label']}", line_number)
-                if entry_panels != panels:
-                    add_issue(
-                        errors,
-                        f"caption panels {panels} do not match asset panels {entry_panels}: {asset}",
-                        line_number,
-                    )
-                if kind == "panel" and len(panels) != 1:
-                    add_issue(errors, "multi-panel caption uses a single-panel asset", line_number)
-                if kind in {"panel-set", "group"} and len(panels) < 2:
-                    add_issue(errors, "single-panel caption uses a panel-set asset", line_number)
-        else:
-            allowed = kind == "full" or (
-                kind == "panel"
-                and len(figure_panel_keys(manifest, figure_id)) == 1
-            )
-            if not allowed:
-                add_issue(warnings, f"whole-figure caption uses non-full asset: {asset}", line_number)
-    if assets_dir is not None and assets_dir.exists():
-        assets = {path.resolve() for path in assets_dir.glob("*.png")}
-        unreferenced = sorted(path.name for path in assets - referenced)
-        stats["assets"] = len(assets)
-        stats["unreferenced_assets"] = len(unreferenced)
-        for name in unreferenced:
-            add_issue(warnings, f"unreferenced asset: {name}")
-        if manifest:
-            for group in manifest.get("groups", []):
-                filename = group.get("filename")
-                if filename and not (assets_dir / filename).exists():
-                    add_issue(warnings, f"manifest group asset missing: {filename}")
+            asset = Path(link_target(match.group(1))).name
+            info = caption_block_info(lines, line_number)
+            if info is None:
+                add_issue(errors, "image has no bold caption label", line_number)
+                continue
+            if info.get("prefix") is None:
+                add_issue(warnings, f"caption labels span multiple figures: {info['label']}", line_number)
+                continue
+            entry = asset_index.get(asset)
+            if entry is None:
+                add_issue(warnings, f"asset is not in the asset index: {asset}", line_number)
+                continue
+            figure_id = manifest_figure_id(info, manifest_figures)
+            if figure_id is None:
+                add_issue(warnings, f"caption figure not found in manifest: {info['label']}", line_number)
+                continue
+            panels = panel_tuple(info["panels"])
+            entry_panels = panel_tuple(entry.get("panels", []))
+            kind = entry.get("kind")
+            if panels:
+                if kind == "full":
+                    add_issue(errors, f"full-figure asset used for panel caption: {info['label']}", line_number)
+                elif kind in {"panel", "panel-set", "group"}:
+                    if entry.get("figure") != figure_id:
+                        add_issue(errors, f"asset figure {entry.get('figure')} does not match caption {info['label']}", line_number)
+                    if entry_panels != panels:
+                        add_issue(
+                            errors,
+                            f"caption panels {panels} do not match asset panels {entry_panels}: {asset}",
+                            line_number,
+                        )
+                    if kind == "panel" and len(panels) != 1:
+                        add_issue(errors, "multi-panel caption uses a single-panel asset", line_number)
+                    if kind in {"panel-set", "group"} and len(panels) < 2:
+                        add_issue(errors, "single-panel caption uses a panel-set asset", line_number)
+            else:
+                allowed = kind == "full" or (
+                    kind == "panel"
+                    and len(figure_panel_keys(manifest, figure_id)) == 1
+                )
+                if not allowed:
+                    add_issue(warnings, f"whole-figure caption uses non-full asset: {asset}", line_number)
+        if assets_dir is not None and assets_dir.exists():
+            assets = {path.resolve() for path in assets_dir.glob("*.png")}
+            unreferenced = sorted(path.name for path in assets - referenced)
+            stats["assets"] = len(assets)
+            stats["unreferenced_assets"] = len(unreferenced)
+            for name in unreferenced:
+                add_issue(warnings, f"unreferenced asset: {name}")
+            if manifest:
+                for group in manifest.get("groups", []):
+                    filename = group.get("filename")
+                    if filename and not (assets_dir / filename).exists():
+                        add_issue(warnings, f"manifest group asset missing: {filename}")
 
     # Formatting checks.
     trailing = [number for number, line in enumerate(lines, 1) if line != line.rstrip()]
@@ -742,41 +773,43 @@ def main() -> int:
         for extra in sorted(handbook_chapter_ids - units_stats.get("chapter_ids", set())):
             add_issue(errors, f"chapter {extra} is in the handbook but missing from units.json")
 
-        unit_section_by_id = {}
-        for section in unit_sections:
-            match = re.match(r"^(\d+\.\d+)\b", section["text"])
-            if match:
-                unit_section_by_id[match.group(1)] = section
-        exceptions = units_stats.get("unit_exceptions", {})
-        for unit_id, citations in units_stats.get("unit_evidence", {}).items():
-            section = unit_section_by_id.get(unit_id)
-            if section is None:
-                continue
-            images = collect_unit_images(lines, section["line"], section["end"])
-            check_unit_coverage(
-                unit_id,
-                citations,
-                images,
-                manifest,
-                errors,
-                warnings,
-                bool(exceptions.get(unit_id)),
-            )
+        if not text_only:
+            unit_section_by_id = {}
+            for section in unit_sections:
+                match = re.match(r"^(\d+\.\d+)\b", section["text"])
+                if match:
+                    unit_section_by_id[match.group(1)] = section
+            exceptions = units_stats.get("unit_exceptions", {})
+            for unit_id, citations in units_stats.get("unit_evidence", {}).items():
+                section = unit_section_by_id.get(unit_id)
+                if section is None:
+                    continue
+                images = collect_unit_images(lines, section["line"], section["end"])
+                check_unit_coverage(
+                    unit_id,
+                    citations,
+                    images,
+                    manifest,
+                    errors,
+                    warnings,
+                    bool(exceptions.get(unit_id)),
+                )
 
     captions = None
     source_text = None
     if args.source:
         source_dir = args.source.resolve()
-        captions_path = source_dir / "captions.json"
-        if captions_path.exists():
-            try:
-                captions = read_json(captions_path)
-            except Exception as exc:
-                add_issue(warnings, f"cannot read captions.json: {exc}")
+        if not text_only:
+            captions_path = source_dir / "captions.json"
+            if captions_path.exists():
+                try:
+                    captions = read_json(captions_path)
+                except Exception as exc:
+                    add_issue(warnings, f"cannot read captions.json: {exc}")
         source_path = source_dir / "source_text.md"
         if source_path.exists():
             source_text = source_path.read_text(encoding="utf-8")
-    if units_stats.get("evidence"):
+    if not text_only and units_stats.get("evidence"):
         check_coverage(units_stats["evidence"], manifest, captions, errors, warnings)
 
     if args.fidelity and source_text:
@@ -812,6 +845,10 @@ def main() -> int:
     print(f"chapters={stats.get('chapters', 0)}")
     print(f"units={stats.get('units', 0)}")
     print(f"images={stats.get('images', 0)}")
+    print(f"text_only={str(text_only).lower()}")
+    if text_only:
+        print("figure_checks=skipped")
+        print(f"images_ignored={stats.get('images_ignored', 0)}")
     print(f"assets={stats.get('assets', 0)}")
     print(f"unreferenced_assets={stats.get('unreferenced_assets', 0)}")
     print(f"errors={len(errors)}")

@@ -4,11 +4,13 @@ Run the scripts, then perform the judgment checks the scripts cannot make.
 
 ## 1. Execution
 
+- [ ] `check_environment.py` passed, or the text-only fallback is documented.
 - [ ] `pdf_inventory.py` ran on the intended PDF.
 - [ ] The manifest validates with `paper_manifest.py validate --strict`.
 - [ ] `extract_figures.py` ran without unresolved warnings.
 - [ ] `format_handbook.py --check` is idempotent (no changes).
-- [ ] `verify_handbook.py --strict` has 0 errors and 0 warnings, or every warning is explained in the QA report.
+- [ ] `verify_handbook.py --strict` has 0 errors and 0 warnings, or every warning is explained in the final response.
+- [ ] `finalize_output.py --apply` ran, or the user requested `--keep-work`.
 
 ## 2. Data validity
 
@@ -26,11 +28,12 @@ Run the scripts, then perform the judgment checks the scripts cannot make.
 - [ ] `## Reading conventions` and `## Chapter catalogue` exist.
 - [ ] Every chapter has a chapter-level **Goal and principle.**
 - [ ] Every `N.M` unit has **Goal and principle.**, **Methods** and **Results**.
-- [ ] End matter has A (minimal analysis order), B (threshold table), C (cautions), D (resources).
+- [ ] Reproducibility notes have A (minimal analysis order), B (key parameters and thresholds), C (cautions), D (resources).
 - [ ] Figure captions are bold and use the paper's figure naming.
 
 ## 4. Coverage
 
+- [ ] For a text-only handbook, the final response states that figure coverage was intentionally skipped and how the text was obtained.
 - [ ] Every main figure is in the manifest and either appears in a unit or is explicitly excluded.
 - [ ] Every Methods heading is mapped to a unit or listed in the exclusions.
 - [ ] Shared preprocessing is described once and cross-referenced.
@@ -67,6 +70,7 @@ Investigate any number flagged by `verify_handbook.py --fidelity`. The script is
 
 ## 7. Figure QA
 
+- [ ] Text-only handbooks mark figure QA as not applicable and explain why.
 - [ ] Previews were inspected.
 - [ ] No caption or header is included in a figure crop.
 - [ ] No panel is cut off.
@@ -78,6 +82,6 @@ Investigate any number flagged by `verify_handbook.py --fidelity`. The script is
 
 ## 8. Sign-off
 
-- [ ] `qa_report.md` records verification results, figure QA, known limitations and any regression checks.
-- [ ] The source inventory and units JSON are retained under `source/` and `working/`.
-- [ ] The handbook is delivered as a single Markdown file plus its assets directory.
+- [ ] Verification results, figure QA, known limitations and regression checks are summarized for the user; `qa_report.md` and `qa_report.json` are kept only with `--keep-work`.
+- [ ] Temporary source, working, calibration, preview, backup and manifest files are removed by default.
+- [ ] The handbook is delivered as a single Markdown file plus its assets directory, or as a single Markdown file for a text-only handbook.
