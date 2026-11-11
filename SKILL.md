@@ -4,7 +4,7 @@ description: Convert a published paper PDF into a source-grounded, method-center
 compatibility: Requires Python 3.10+ with PyMuPDF and Pillow.
 license: MIT
 metadata:
-  version: "0.1.0"
+  version: "0.2.0"
   author: "Hongpan Zhang"
   repository: "https://github.com/hongpan-z/paper-to-method-handbook.git"
 ---
@@ -133,10 +133,12 @@ Create a per-paper manifest with `scripts/paper_manifest.py init`, then calibrat
 
 ```bash
 python scripts/paper_manifest.py init --pdf "path/to/paper.pdf" --out "output/paper_manifest.json"
-python scripts/calibrate_figure_boxes.py --manifest "output/paper_manifest.json" --figures "Figure 1"
+python scripts/calibrate_figure_boxes.py --manifest "output/paper_manifest.json"
 ```
 
-Read the generated grid image, then write exact panel coordinates into the manifest. Use `page-crop` with PDF points for vector/multi-panel figures and `embedded-panel` with image pixels for raster figures. The script never chooses boxes.
+Calibrate all unresolved figures in one run. Use `--figures` only when re-calibrating specific figures.
+
+Read the generated grid images, then write exact panel coordinates into the manifest. Use `page-crop` with PDF points for vector/multi-panel figures and `embedded-panel` with image pixels for raster figures. The script never chooses boxes.
 
 Record the panels cited by each Results section in `units.json` (`result_blocks` or `evidence`). Build panel sets mechanically:
 
@@ -161,11 +163,26 @@ Extract and preview:
 python scripts/extract_figures.py --manifest "output/paper_manifest.json" --previews
 ```
 
+Assets default to a maximum long edge of 1600 px and optimized PNG. Override globally with `output_max_px` or `--max-px`, or per figure/panel set/group with `max_px`.
+
 Check `_qa/previews/` visually. Re-crop any panel that includes a header, caption or cut-off content. Embed the panel/group assets in the relevant Results blocks with a caption label that matches the embedded panel set.
+
+For later figure edits, re-crop only the affected figure and its dependent panel sets/groups:
+
+```bash
+python scripts/extract_figures.py \
+  --manifest "output/paper_manifest.json" \
+  --only "Figure 3" --previews
+```
+
+Changed geometry is detected against `asset_index.json`; `--force` re-crops every requested asset.
 
 ### Phase 5 — Normalize and verify
 
+Draft from `units.json` in one pass. Use the formatter's `--check` mode during iteration, then write once at the end:
+
 ```bash
+python scripts/format_handbook.py --handbook "output/handbook.md" --check
 python scripts/format_handbook.py --handbook "output/handbook.md" --write --backup
 python scripts/verify_handbook.py \
   --handbook "output/handbook.md" \
@@ -175,7 +192,7 @@ python scripts/verify_handbook.py \
   --strict
 ```
 
-`format_handbook.py` is conservative: it never reflows prose. `verify_handbook.py` fails structural, caption, link and asset errors; it warns on heuristic coverage/fidelity issues. Fix all errors before delivery.
+Run the full verifier after all edits. Use `--fidelity` at the final check. `format_handbook.py` is conservative: it never reflows prose. `verify_handbook.py` fails structural, caption, link and asset errors; it warns on heuristic coverage/fidelity issues. Fix all errors before delivery.
 
 The verifier also checks that every caption matches its asset's panel set, that panel-specific claims do not use a full figure, and that every cited consecutive run has a matching image. If a scoped handbook shares an assets directory with a full handbook, pass `--reference-handbook full-handbook.md` so the unreferenced-asset check uses the union of both handbooks.
 
@@ -255,7 +272,7 @@ Full rules are in `references/formatting.md`. Summary:
 | `paper_manifest.py` | Initialize and validate a per-paper figure manifest | Yes; no page/panel guessing |
 | `calibrate_figure_boxes.py` | Render grids and detected image rectangles for manual coordinate entry | Yes; rendering only |
 | `build_panel_sets.py` | Split cited panels into consecutive runs and write `panel_sets` | Yes; structured input only |
-| `extract_figures.py` | Crop panels and union-rectangle panel sets; write `asset_index.json` and previews | Yes |
+| `extract_figures.py` | Crop panels, panel sets and groups; incremental re-crop, compressed assets, `asset_index.json` and previews | Yes |
 | `format_handbook.py` | Normalize safe Markdown formatting and bold Results captions | Yes; skips ambiguous cases |
 | `verify_handbook.py` | Structure, anchors, assets, caption/panel matching, coverage, optional fidelity flags | Yes; hard errors vs. warnings |
 | `finalize_output.py` | Remove temporary workflow files; keep only handbooks and assets | Yes; dry-run by default |

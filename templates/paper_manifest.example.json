@@ -10,6 +10,10 @@
   "assets_dir": "example-2026.assets",
   "figure_rights": "user-confirmed",
   "default_dpi": 300,
+  "output_dpi": 300,
+  "output_max_px": 1600,
+  "asset_format": "png",
+  "png_compress_level": 9,
   "padding_pt": 6,
   "padding_px": 15,
   "figures": [
@@ -30,6 +34,7 @@
       "mode": "embedded-panel",
       "units": "px",
       "image_index": 0,
+      "max_px": 2000,
       "panels": {
         "A": [100, 80, 1600, 2550],
         "B": [1550, 80, 3952, 2550]

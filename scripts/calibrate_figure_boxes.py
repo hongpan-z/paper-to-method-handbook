@@ -1,13 +1,15 @@
 """Render calibration grids and detected image rectangles.
 
-This is a drawing aid only. It never chooses panel boxes. Read the generated
-grid image, then write exact coordinates into the manifest.
+This is a drawing aid only. It never chooses panel boxes. Rendered pages and
+embedded images are cached so figures sharing a page do not re-render it. Read
+the generated grid image, then write exact coordinates into the manifest.
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
+from collections import OrderedDict
 from pathlib import Path
 
 import pymupdf
@@ -76,18 +78,32 @@ def resolve_image_info(page: pymupdf.Page, figure: dict) -> dict | None:
     return max(infos, key=lambda info: int(info.get("width", 0)) * int(info.get("height", 0)))
 
 
-def embedded_image(doc: pymupdf.Document, page: pymupdf.Page, figure: dict) -> tuple[Image.Image, dict] | tuple[None, None]:
+def embedded_image(
+    doc: pymupdf.Document,
+    page: pymupdf.Page,
+    figure: dict,
+    cache: OrderedDict[tuple[int, int], tuple[Image.Image, dict]] | None = None,
+) -> tuple[Image.Image, dict] | tuple[None, None]:
     info = resolve_image_info(page, figure)
     if info is None:
         return None, None
     xref = int(info.get("xref", 0))
     if not xref:
         return None, None
+    key = (page.number, xref)
+    if cache is not None and key in cache:
+        cache.move_to_end(key)
+        return cache[key]
     try:
         pix = pymupdf.Pixmap(doc, xref)
-        return pixmap_to_image(pix), info
+        image = pixmap_to_image(pix)
     except Exception:
         return None, None
+    if cache is not None:
+        cache[key] = (image, info)
+        while len(cache) > 2:
+            cache.popitem(last=False)
+    return image, info
 
 
 def main() -> int:
@@ -122,6 +138,8 @@ def main() -> int:
 
     doc = pymupdf.open(str(paths["pdf"]))
     written = 0
+    page_cache: OrderedDict[tuple[int, int], Image.Image] = OrderedDict()
+    embedded_cache: OrderedDict[tuple[int, int], tuple[Image.Image, dict]] = OrderedDict()
     for figure in figures:
         fig_id = figure.get("id", "unknown")
         page_number = int(figure.get("page", 0))
@@ -134,8 +152,17 @@ def main() -> int:
         out_path = out_dir / f"{manifest.get('slug', 'paper')}-{stem}-grid.png"
 
         if mode == "page-crop":
-            pix = page.get_pixmap(dpi=args.dpi, alpha=False)
-            image = pixmap_to_image(pix)
+            cache_key = (page_number, args.dpi)
+            if cache_key in page_cache:
+                page_cache.move_to_end(cache_key)
+                image = page_cache[cache_key].copy()
+            else:
+                pix = page.get_pixmap(dpi=args.dpi, alpha=False)
+                base = pixmap_to_image(pix)
+                page_cache[cache_key] = base
+                while len(page_cache) > 4:
+                    page_cache.popitem(last=False)
+                image = base.copy()
             scale = args.dpi / 72.0
             draw_grid(image, args.step_pt, scale)
             draw = ImageDraw.Draw(image)
@@ -155,7 +182,7 @@ def main() -> int:
             print(f"{out_path}  page={page_number}  size_pt={page.rect.width:.1f}x{page.rect.height:.1f}")
             written += 1
         elif mode in {"embedded-panel", "embedded-full"}:
-            image, info = embedded_image(doc, page, figure)
+            image, info = embedded_image(doc, page, figure, embedded_cache)
             if image is None:
                 print(
                     f"WARNING: {fig_id}: no embedded image on page {page_number}; "

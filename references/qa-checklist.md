@@ -71,6 +71,9 @@ Investigate any number flagged by `verify_handbook.py --fidelity`. The script is
 ## 7. Figure QA
 
 - [ ] Text-only handbooks mark figure QA as not applicable and explain why.
+- [ ] Figure assets respect the 1600 px default or have a documented `max_px` override.
+- [ ] Optimized PNG assets remain legible at 100%.
+- [ ] Only changed figures were re-cropped during iteration.
 - [ ] Previews were inspected.
 - [ ] No caption or header is included in a figure crop.
 - [ ] No panel is cut off.

@@ -270,12 +270,34 @@ def pixmap_to_image(pix: pymupdf.Pixmap) -> Image.Image:
     return image.convert("RGB")
 
 
-def save_png(image: Image.Image, path: Path, dpi: int | None = None) -> None:
+def resize_to_max_px(image: Image.Image, max_px: int | None) -> Image.Image:
+    if not max_px or max_px <= 0:
+        return image
+    if max(image.size) <= max_px:
+        return image
+    from PIL import Image
+
+    resized = image.copy()
+    resized.thumbnail((max_px, max_px), Image.Resampling.LANCZOS)
+    return resized
+
+
+def save_png(
+    image: Image.Image,
+    path: Path,
+    dpi: int | None = None,
+    optimize: bool = False,
+    compress_level: int = 6,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    options: dict[str, Any] = {}
     if dpi:
-        image.save(path, dpi=(dpi, dpi))
-    else:
-        image.save(path)
+        options["dpi"] = (dpi, dpi)
+    if optimize:
+        options["optimize"] = True
+    if compress_level != 6:
+        options["compress_level"] = max(0, min(9, int(compress_level)))
+    image.save(path, **options)
 
 
 def save_jpeg(image: Image.Image, path: Path, quality: int = 82) -> None:

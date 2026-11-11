@@ -41,6 +41,10 @@ Examples:
   "assets_dir": "paper-2026.assets",
   "figure_rights": "user-confirmed",
   "default_dpi": 300,
+  "output_dpi": 300,
+  "output_max_px": 1600,
+  "asset_format": "png",
+  "png_compress_level": 9,
   "padding_pt": 6,
   "padding_px": 15,
   "figures": [],
@@ -69,6 +73,7 @@ Examples:
 - `image_index` or `image_xref` selects an embedded image for `embedded-panel` mode. If omitted, the largest image on the page is used.
 - `dpi` overrides `default_dpi` for page crops.
 - `padding_pt` / `padding_px` override the manifest defaults.
+- `max_px` overrides `output_max_px` for a single figure, panel set or group.
 - `panels` keys are letters (`A`, `B`, `a`, `b`) or `""` for a full figure. Asset names are derived from the figure id and panel.
 
 ### Panel sets
@@ -119,12 +124,50 @@ Custom concatenation or cross-panel layouts are an explicit fallback, not the de
     "panels": ["F", "G", "H"],
     "mode": "page-crop",
     "page": 7,
-    "box": [88, 462, 562, 548]
+    "box": [88, 462, 562, 548],
+    "dpi": 300,
+    "padding_pt": 6,
+    "max_px": 1600,
+    "compress_level": 9,
+    "width": 1600,
+    "height": 290,
+    "bytes": 182334,
+    "format": "png"
   }
 }
 ```
 
-Kinds are `panel`, `panel-set`, `full` and `group`. The verifier uses the index to check that a caption label matches the embedded set and that a full figure is not used for a panel claim. The index is temporary; `finalize_output.py` removes it from the delivered assets directory unless `--keep-work` is used.
+Kinds are `panel`, `panel-set`, `full` and `group`. The verifier uses the index to check that a caption label matches the embedded set and that a full figure is not used for a panel claim. Geometry fields drive incremental re-cropping; size fields record the compressed output. The index is temporary; `finalize_output.py` removes it from the delivered assets directory unless `--keep-work` is used.
+
+## Incremental extraction
+
+`--only "Figure 3"` processes Figure 3's panels, its panel sets and any groups sourced from Figure 3. Other figures, panel sets and groups are left untouched.
+
+Before skipping an existing asset, the extractor compares the current manifest geometry with the existing `asset_index.json` entry: page, mode, panels, boxes, DPI, padding, image selection and compression settings. Changed or missing assets are re-cropped automatically. `--force` re-crops every requested asset. The updated entries are merged into the existing index, so unrelated assets keep their index records.
+
+Page-crop extraction and calibration cache rendered pages per DPI when several figures, panels or groups share a page. Very large or rotated pages fall back to direct clipping.
+
+Use this for the fast iteration loop:
+
+```bash
+python scripts/extract_figures.py \
+  --manifest "output/paper_manifest.json" \
+  --only "Figure 3" --previews
+```
+
+`--previews` writes previews only for re-cropped assets. Use `--previews-all` to refresh every preview.
+
+## Asset compression
+
+Delivered assets are downscaled to a maximum long edge of 1600 px and saved as optimized PNG. The image is never upscaled. Aspect ratio is preserved with LANCZOS resampling.
+
+- Override the default with `output_max_px` in the manifest or `--max-px` on the command line.
+- Override a single figure, panel set or group with `max_px`.
+- Only PNG output is currently supported; `asset_format` must be `"png"`.
+- `png_compress_level` defaults to 9.
+- `asset_index.json` records the final width, height, byte size and format.
+
+Previews remain separate JPEG files capped at 900 px for visual QA.
 
 ## Calibration workflow
 
@@ -138,7 +181,7 @@ Kinds are `panel`, `panel-set`, `full` and `group`. The verifier uses the index 
 8. Run `extract_figures.py --previews`.
 9. Inspect `_qa/previews/`. Re-crop if a header, caption or panel is cut off.
 
-The manifest, `_calibration/`, `_qa/` previews and backups are temporary. `finalize_output.py` removes them at delivery unless `--keep-work` is used.
+Calibration caches rendered pages per DPI when several figures share a page. The manifest, `_calibration/`, `_qa/` previews and backups are temporary. `finalize_output.py` removes them at delivery unless `--keep-work` is used.
 
 The calibration script never guesses boxes. If a figure has no embedded image and is vector-rendered, use `page-crop`.
 

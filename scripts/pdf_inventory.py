@@ -37,10 +37,33 @@ METHODS_KEYWORDS = [
 ]
 
 
-def page_lines(page: pymupdf.Page) -> list[dict]:
+def text_blocks(page: pymupdf.Page) -> list[dict]:
     data = page.get_text("dict")
+    return [
+        block for block in data.get("blocks", []) if int(block.get("type", 0) or 0) == 0
+    ]
+
+
+def block_text(block: dict) -> str:
+    lines = []
+    for line in block.get("lines", []):
+        lines.append("".join(span.get("text", "") for span in line.get("spans", [])))
+    return "\n".join(lines)
+
+
+def page_text(blocks: list[dict]) -> str:
+    lines = []
+    for block in blocks:
+        for line in block.get("lines", []):
+            lines.append("".join(span.get("text", "") for span in line.get("spans", [])))
+    if not lines:
+        return ""
+    return "\n".join(lines) + "\n"
+
+
+def page_lines(blocks: list[dict]) -> list[dict]:
     lines: list[dict] = []
-    for block in data.get("blocks", []):
+    for block in blocks:
         for line in block.get("lines", []):
             spans = line.get("spans", [])
             text = "".join(span.get("text", "") for span in spans).strip()
@@ -75,15 +98,15 @@ def candidate_headings(lines: list[dict], body_size: float) -> list[dict]:
     return headings
 
 
-def caption_candidates(page: pymupdf.Page) -> list[dict]:
+def caption_candidates(blocks: list[dict]) -> list[dict]:
     captions = []
-    for block in page.get_text("blocks"):
-        text = re.sub(r"\s+", " ", block[4] or "").strip()
+    for block in blocks:
+        text = re.sub(r"\s+", " ", block_text(block)).strip()
         if text and CAPTION_START_RE.match(text):
             captions.append(
                 {
                     "text": text,
-                    "bbox": [round(float(v), 2) for v in block[:4]],
+                    "bbox": [round(float(v), 2) for v in block.get("bbox", (0, 0, 0, 0))],
                 }
             )
     return captions
@@ -189,12 +212,13 @@ def main() -> int:
 
     for page_number in selected:
         page = doc[page_number - 1]
-        text = page.get_text()
-        lines = page_lines(page)
+        blocks = text_blocks(page)
+        text = page_text(blocks)
+        lines = page_lines(blocks)
         sizes = [line["size"] for line in lines if line["size"]]
         body_size = round(statistics.median(sizes), 2) if sizes else 10.0
         headings = candidate_headings(lines, body_size)
-        captions = caption_candidates(page)
+        captions = caption_candidates(blocks)
         images = image_records(page)
         methods = methods_candidates(page_number, text)
         methods_all.extend(methods)

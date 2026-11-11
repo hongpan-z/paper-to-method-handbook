@@ -96,6 +96,22 @@ def validate_manifest(
     if not assets_dir:
         errors.append("assets_dir is required")
 
+    output_max_px = manifest.get("output_max_px")
+    if output_max_px is not None and (
+        not isinstance(output_max_px, int) or output_max_px < 1
+    ):
+        errors.append("output_max_px must be a positive integer")
+    asset_format = manifest.get("asset_format")
+    if asset_format is not None and str(asset_format).lower() != "png":
+        errors.append("asset_format must be 'png'")
+    png_compress_level = manifest.get("png_compress_level")
+    if png_compress_level is not None and (
+        not isinstance(png_compress_level, int)
+        or png_compress_level < 0
+        or png_compress_level > 9
+    ):
+        errors.append("png_compress_level must be an integer between 0 and 9")
+
     figures = manifest.get("figures")
     if not isinstance(figures, list):
         errors.append("figures must be an array")
@@ -157,6 +173,10 @@ def validate_manifest(
         elif mode in {"embedded-panel", "embedded-full"} and units != "px":
             errors.append(f"{fig_id}: {mode} requires units='px'")
 
+        max_px = figure.get("max_px")
+        if max_px is not None and (not isinstance(max_px, int) or max_px < 1):
+            errors.append(f"{fig_id}: max_px must be a positive integer")
+
         panels = figure.get("panels")
         if not isinstance(panels, dict) or not panels:
             errors.append(f"{fig_id}: panels must be a non-empty object")
@@ -215,6 +235,9 @@ def validate_manifest(
         if set_id in seen_panel_set_ids:
             errors.append(f"duplicate panel_set id: {set_id}")
         seen_panel_set_ids.add(set_id)
+        max_px = panel_set.get("max_px")
+        if max_px is not None and (not isinstance(max_px, int) or max_px < 1):
+            errors.append(f"{set_id}: max_px must be a positive integer")
         figure_id = panel_set.get("figure")
         figure = figure_index.get(str(figure_id)) if figure_id else None
         if figure is None:
@@ -273,6 +296,9 @@ def validate_manifest(
         if not group_id:
             errors.append(f"{prefix}.id is required")
             continue
+        max_px = group.get("max_px")
+        if max_px is not None and (not isinstance(max_px, int) or max_px < 1):
+            errors.append(f"{group_id}: max_px must be a positive integer")
         filename = group.get("filename") or group_filename(group_id)
         if filename in seen_assets:
             warnings.append(f"duplicate generated asset name: {filename}")
@@ -340,6 +366,12 @@ def cmd_init(args: argparse.Namespace) -> int:
         "assets_dir": args.assets_dir or f"{slug}.assets",
         "figure_rights": "user-confirmed",
         "default_dpi": 300,
+        "output_dpi": 300,
+        "output_max_px": 1600,
+        "asset_format": "png",
+        "png_compress_level": 9,
+        "padding_pt": 0,
+        "padding_px": 0,
         "figures": [],
         "panel_sets": [],
         "groups": [],
